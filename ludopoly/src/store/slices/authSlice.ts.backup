@@ -1,0 +1,340 @@
+import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit'
+import { apiServiceFactory } from '../../services/api/factories/APIServiceFactory'
+import type { IUserAccount } from '../../services/api/interfaces/IBlockchainAPI'
+
+// RootState type import - circular dependency'den kaçınmak için any kullanıyoruz
+type RootState = any
+
+// Auth state interface - blockchain entegrasyonu ile güncellendi
+interface AuthState {
+  isAuthenticated: boolean
+  userAccount?: IUserAccount
+  isLoading: boolean
+  error: string | null
+  registrationStep?: 'username' | 'profile' | 'blockchain' | 'completed'
+  walletAddress?: string
+}
+
+// User hesabını kontrol et - Backend yok, sadece blockchain
+export const checkUserAccount = createAsyncThunk(
+  'auth/checkUserAccount',
+  async (address: string, { rejectWithValue }) => {
+    try {
+      console.log('checkUserAccount thunk called for:', address)
+      
+      // Backend olmadığı için direkt blockchain service kullan
+      const blockchainService = apiServiceFactory.getBlockchainService()
+      const hasAccount = await blockchainService.hasAccount(address)
+      
+      console.log('hasAccount result:', hasAccount)
+      
+      let account: IUserAccount
+      
+      if (hasAccount) {
+        // Hesap varsa blockchain'den bilgileri al
+        try {
+          const userAccount = await blockchainService.getUserAccount?.(address)
+          if (userAccount) {
+            account = {
+              address,
+              balance: '0.0', // TODO: Wallet balance'ı al
+              isRegistered: true,
+              username: userAccount.handle,
+              profileImageUrl: userAccount.metadataCID ? `https://ipfs.io/ipfs/${userAccount.metadataCID}` : undefined,
+              gameStats: {
+                gamesPlayed: 0, // TODO: Blockchain'den al
+                gamesWon: 0,    // TODO: Blockchain'den al
+                totalEarnings: userAccount.score
+              },
+              createdAt: new Date(parseInt(userAccount.createdAt) * 1000).toISOString(),
+              lastLoginAt: new Date().toISOString()
+            }
+          } else {
+            // Hesap var ama bilgiler alınamadı
+            account = {
+              address,
+              balance: '0.0',
+              isRegistered: true,
+              gameStats: {
+                gamesPlayed: 0,
+                gamesWon: 0,
+                totalEarnings: '0.0'
+              },
+              createdAt: new Date().toISOString(),
+              lastLoginAt: new Date().toISOString()
+            }
+          }
+        } catch (accountError) {
+          console.warn('Failed to get account details, using basic account:', accountError)
+          account = {
+            address,
+            balance: '0.0',
+            isRegistered: true,
+            gameStats: {
+              gamesPlayed: 0,
+              gamesWon: 0,
+              totalEarnings: '0.0'
+            },
+            createdAt: new Date().toISOString(),
+            lastLoginAt: new Date().toISOString()
+          }
+        }
+      } else {
+        // Hesap yok - kayıt domainne yönlendirilecek
+        account = {
+          address,
+          balance: '0.0',
+          isRegistered: false,
+          gameStats: {
+            gamesPlayed: 0,
+            gamesWon: 0,
+            totalEarnings: '0.0'
+          },
+          createdAt: new Date().toISOString(),
+          lastLoginAt: new Date().toISOString()
+        }
+      }
+      
+      console.log('final account object:', account)
+      return { account, address }
+    } catch (error) {
+      console.error('checkUserAccount error:', error)
+      return rejectWithValue('Failed to check account on blockchain')
+    }
+  }
+)
+
+// Yeni user hesabı oluştur - Backend yok
+export const createUserAccount = createAsyncThunk(
+  'auth/createUserAccount',
+  async (address: string, { rejectWithValue }) => {
+    try {
+      // Backend olmadığı için sadece local account data oluştur
+      const account: IUserAccount = {
+        address,
+        balance: '0.0',
+        isRegistered: false,
+        gameStats: {
+          gamesPlayed: 0,
+          gamesWon: 0,
+          totalEarnings: '0.0'
+        },
+        createdAt: new Date().toISOString(),
+        lastLoginAt: new Date().toISOString()
+      }
+      
+      return account
+    } catch (error) {
+      return rejectWithValue('Failed to create account')
+    }
+  }
+)
+
+// Blockchain'e kullanıcı kaydı
+export const registerUserOnBlockchain = createAsyncThunk(
+  'auth/registerUserOnBlockchain',
+  async (
+    { address, username, ipfsUrl }: { address: string; username: string; ipfsUrl: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      const blockchainService = apiServiceFactory.getBlockchainService()
+      // NOTE: registerUser artık mevcut değil - kayıt işlemi external domain'de yapılıyor
+      // const result = await blockchainService.registerUser(address, username, ipfsUrl)
+      
+      // Bu thunk artık kullanılmıyor, external registration'a yönlendirme yapılıyor
+      throw new Error('Registration should be done through external domain')
+      
+      // if (!result.success) {
+      //   throw new Error(result.error || 'Registration failed')
+      // }
+      
+      // return { transactionHash: result.transactionHash!, username, ipfsUrl }
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Registration failed')
+    }
+  }
+)
+
+// Username müsaitlik kontrolü - Direkt blockchain
+export const checkUsernameAvailability = createAsyncThunk(
+  'auth/checkUsernameAvailability',
+  async (username: string, { rejectWithValue }) => {
+    try {
+      const blockchainService = apiServiceFactory.getBlockchainService()
+      const available = await blockchainService.isHandleAvailable(username)
+      
+      return available
+    } catch (error) {
+      return rejectWithValue('Failed to check username availability')
+    }
+  }
+)
+
+// Logout async thunk
+export const logoutUser = createAsyncThunk(
+  'auth/logout',
+  async () => {
+    // Logout işlemleri (cüzdan bağlantısını kesme vb.)
+    localStorage.removeItem('walletAddress')
+    return null
+  }
+)
+
+// Initial state
+const initialState: AuthState = {
+  isAuthenticated: false,
+  userAccount: undefined,
+  isLoading: false,
+  error: null
+}
+
+// Slice tanımı
+const authSlice = createSlice({
+  name: 'auth',
+  initialState,
+  reducers: {
+    // Kullanıcı bilgilerini güncelle
+    updateUserAccount: (state, action: PayloadAction<Partial<IUserAccount>>) => {
+      if (state.userAccount) {
+        Object.assign(state.userAccount, action.payload)
+      }
+    },
+    
+    // Error temizle
+    clearAuthError: (state) => {
+      state.error = null
+    },
+    
+    // Registration step ayarla
+    setRegistrationStep: (state, action: PayloadAction<AuthState['registrationStep']>) => {
+      state.registrationStep = action.payload
+    },
+    
+    // Wallet adresini ayarla
+    setWalletAddress: (state, action: PayloadAction<string>) => {
+      state.walletAddress = action.payload
+      localStorage.setItem('walletAddress', action.payload)
+    },
+    
+    // Local storage'dan wallet kontrol et (hydration)
+    checkWalletStatus: (state) => {
+      const walletAddress = localStorage.getItem('walletAddress')
+      if (walletAddress) {
+        state.walletAddress = walletAddress
+        // Bu durumda kullanıcı hesabını tekrar kontrol etmek gerekebilir
+      }
+    }
+  },
+  extraReducers: (builder) => {
+    // Check user account
+    builder
+      .addCase(checkUserAccount.pending, (state) => {
+        state.isLoading = true
+        state.error = null
+      })
+      .addCase(checkUserAccount.fulfilled, (state, action) => {
+        console.log('checkUserAccount.fulfilled:', action.payload)
+        state.isLoading = false
+        state.userAccount = action.payload.account
+        state.walletAddress = action.payload.address
+        state.isAuthenticated = action.payload.account.isRegistered
+        console.log('isAuthenticated set to:', state.isAuthenticated)
+        
+        if (!action.payload.account.isRegistered) {
+          state.registrationStep = 'username'
+          console.log('User not registered, registrationStep set to username')
+        } else {
+          console.log('User is registered, should be authenticated')
+        }
+      })
+      .addCase(checkUserAccount.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload as string
+      })
+    
+    // Create user account
+    builder
+      .addCase(createUserAccount.pending, (state) => {
+        state.isLoading = true
+        state.error = null
+      })
+      .addCase(createUserAccount.fulfilled, (state, action) => {
+        state.isLoading = false
+        state.userAccount = action.payload
+        state.registrationStep = 'username'
+      })
+      .addCase(createUserAccount.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload as string
+      })
+    
+    // Register on blockchain
+    builder
+      .addCase(registerUserOnBlockchain.pending, (state) => {
+        state.isLoading = true
+        state.error = null
+        state.registrationStep = 'blockchain'
+      })
+      .addCase(registerUserOnBlockchain.fulfilled, (state, action) => {
+        state.isLoading = false
+        state.isAuthenticated = true
+        state.registrationStep = 'completed'
+        
+        if (state.userAccount) {
+          state.userAccount.isRegistered = true
+          state.userAccount.username = action.payload.username
+          state.userAccount.profileImageUrl = action.payload.ipfsUrl
+        }
+      })
+      .addCase(registerUserOnBlockchain.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload as string
+        state.registrationStep = 'username'
+      })
+    
+    // Username availability check
+    builder
+      .addCase(checkUsernameAvailability.pending, (state) => {
+        state.isLoading = true
+      })
+      .addCase(checkUsernameAvailability.fulfilled, (state) => {
+        state.isLoading = false
+      })
+      .addCase(checkUsernameAvailability.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload as string
+      })
+    
+    // Logout
+    builder.addCase(logoutUser.fulfilled, (state) => {
+      state.isAuthenticated = false
+      state.userAccount = undefined
+      state.walletAddress = undefined
+      state.error = null
+      state.isLoading = false
+      state.registrationStep = undefined
+    })
+  }
+})
+
+// Export actions
+export const { 
+  updateUserAccount, 
+  clearAuthError, 
+  setRegistrationStep,
+  setWalletAddress,
+  checkWalletStatus
+} = authSlice.actions
+
+// Export reducer
+export default authSlice.reducer
+
+// Selectors
+export const selectAuthState = (state: RootState) => state.auth
+export const selectIsAuthenticated = (state: RootState) => state.auth.isAuthenticated
+export const selectUserAccount = (state: RootState) => state.auth.userAccount
+export const selectAuthError = (state: RootState) => state.auth.error
+export const selectAuthLoading = (state: RootState) => state.auth.isLoading
+export const selectRegistrationStep = (state: RootState) => state.auth.registrationStep
+export const selectWalletAddress = (state: RootState) => state.auth.walletAddress
