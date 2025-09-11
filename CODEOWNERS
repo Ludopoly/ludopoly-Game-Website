@@ -1,0 +1,52 @@
+# CODEOWNERS Dosyası
+# Bu dosya otomatik olarak belirtilen kullanıcıları/ekipleri reviewer olarak atar
+
+# =============================================================================
+# GLOBAL KURALLAR - Tüm dosyalar için geçerli
+# =============================================================================
+
+# Tüm dosyalar için default owner (sen)
+* @etherbiln
+
+# =============================================================================
+# ÖZEL DOSYA/KLASÖR KURALLARI
+# =============================================================================
+
+# Root seviye önemli dosyalar
+README.md @etherbiln
+LICENSE @etherbiln
+.gitignore @etherbiln
+package.json @etherbiln
+package-lock.json @etherbiln
+
+# Konfigürasyon dosyaları
+*.config.js @etherbiln
+*.config.json @etherbiln
+.env* @etherbiln
+docker-compose.yml @etherbiln
+Dockerfile @etherbiln
+
+# CI/CD dosyaları
+.github/ @etherbiln
+.gitlab-ci.yml @etherbiln
+
+# Dokümantasyon
+docs/ @etherbiln
+*.md @etherbiln
+
+# =============================================================================
+# FARKLI EKİP/KİŞİLER İÇİN ÖRNEKLER (İsteğe bağlı)
+# =============================================================================
+
+# Eğer frontend ekibi varsa
+# /frontend/ @etherbiln @frontend-team
+
+# Eğer backend ekibi varsa  
+# /backend/ @etherbiln @backend-team
+
+# Eğer belirli bir kişi belirli dosyalara bakıyorsa
+# /database/ @etherbiln @database-expert
+
+# Güvenlik kritik dosyalar
+# /auth/ @etherbiln @security-team
+# /config/security/ @etherbiln @security-team
