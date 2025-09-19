@@ -2,11 +2,13 @@ import { Provider } from 'react-redux'
 import { ThemeProvider, CssBaseline } from '@mui/material'
 import { ludopolyTheme } from './theme'
 import './App.css'
+import "../../frontend/src/index.css"
 import { store } from './store'
 import { ReduxWalletProvider } from './features/wallet'
 import { ReduxAuthProvider } from './features/auth'
 import { SnackbarProvider } from './context/SnackbarProvider'
 import { MainLayout } from './components/layout/MainLayout'
+
 
 function App() {
   return (
@@ -16,7 +18,7 @@ function App() {
         <SnackbarProvider>
           <ReduxWalletProvider>
             <ReduxAuthProvider>
-              <MainLayout />
+               <MainLayout /> 
             </ReduxAuthProvider>
           </ReduxWalletProvider>
         </SnackbarProvider>
