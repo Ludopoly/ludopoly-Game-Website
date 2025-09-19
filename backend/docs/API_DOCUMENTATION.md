@@ -1,4 +1,4 @@
-# 📡 Ludopoly Chat System - API Documentation
+# 📡 Ludopoly Game Chat System - API Documentation
 
 ## 🔗 Base URL
 ```
